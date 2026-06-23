@@ -9,11 +9,26 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 3. **Boundary Review & Region Selection**-Interactively refine reconstructed boundaries and select the target region.
 4. **Centerline Analysis**-Extract Centerline and perform normal valdiation and purning.
 5. **Thickness Measurement**-Measure the local thickness along the validated centerline and generate quantitative outputs.
-<img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />
-*Figure 1. RetinaGauge workflow for retinal layer thickness measurement.*
+<img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />  
+<p align="center"><em>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</em></p>
+
+## Step-by-step demo  
+### Step 1: Launch the tool 
+1. Open Fiji
+2. Go to `Plugins > Macros > Run...`
+3. Select `RetinaLayerGauge_architecture_v6_Github.groovy`
+4. Run > Run or use Ctrl+R (⌘+R on macOS)
+### Step 2: Input image & options  
+1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-out dialog (Fig. 2).
+2.  Set the scale factor in neeed(Fig 2.).
+<img width="397" height="245" alt="Fig2 Loadimg" src="https://github.com/user-attachments/assets/5b3f8e93-2acc-4691-a264-2ec783f4fae2" />
+<p align="center"><em>Figure 2. Dialog for input image.</em></p>  
 
 
-## Step-by-step demo
+
+
+
+
 ## Example Results
 ## Limitations
 ## Citation
