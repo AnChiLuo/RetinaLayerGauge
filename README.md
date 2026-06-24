@@ -69,8 +69,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
    - Return to the Brush mode if further boundary refinement is required.
      
 <p align="left">
-<img src="docs/Fig6GUI_Wand.png" width="500" >
-<img src="docs/Fig7GUI_Wand2.png" width="500">
+<img src="docs/Fig6GUI_Wand.jpg" width="1000" >
 </p>
 <p align="left">
 <em><b> Figure 6. Region selection workflow using the Wnad tool.</b><br>  
