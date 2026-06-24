@@ -38,6 +38,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 
    > **Why is this required?**  
    > The measured diameter is used to constrain gap repair and mask reconstruction.
+### Step 4:
 
 
 
