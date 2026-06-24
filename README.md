@@ -39,8 +39,14 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
    > **Why is this required?**  
    > The measured diameter is used to constrain gap repair and mask reconstruction.
 ### Step 4: Threshold the image and create mask  
-1. You will be asked to confirm the threshold used for nuclear mask extraction.
-2. 
+1. You will be asked to confirm the threshold used for nuclear mask generation.
+<p align="left">
+  <img src="docs/Fig4Threshold.jpg" width="550">
+</p>
+
+<p align="leftr">
+  <em>Figure 4. Fine-tune the threshold value for nuclear segmentation..</em>
+</p>   
 
 
 
