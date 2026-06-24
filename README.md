@@ -45,17 +45,28 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </p>
 
 <p align="leftr">
-  <em>Figure 4. Fine-tune the threshold value for nuclear segmentation..</em>
+  <em>Figure 4. Fine-tune the threshold value for nuclear segmentation.</em>
 </p>   
 
 ### Step 5: Boundary Review & Editing  
 1. Click the `Enable Brush`button to active Brush tool.
    - To connect fragmened boundary use <kbd>Connect Object</kbd>.
    - To split touching objects use <kbd>Split Object</kbd>.
-   - Brush size can be adjusted by `Brush size slider`
+   - Brush size can be adjusted by `Brush size slider`.
    - Adjust raw image transparency for better boundary inspection.
-  <p align="left">
-  <img src="doc">
+<p align="left">
+<img src="docs/Fig5GUI_brush.png" width="650">
+</p>
+<p align="leftr">
+<em>Figure 5. Boundary Review & Editing GUI.</em>
+</p>   
+
+### Step 6: Region Selection  
+1. Click the `Enable Wand`button to active Wand tool.
+   - Software will automatically select whole target object after click target region.
+   - Press <kbd>Add</kbd> to add selected object to `ROI list`.
+   - To delete object use <kbd>Delete</kbd>.
+   - You can go back to Brush mode if object boundary need to be fixed.
 
 
 
