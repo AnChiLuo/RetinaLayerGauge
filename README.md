@@ -1,26 +1,26 @@
 # Retina-layer-Gauge
 **RetinaGauge** is an ImageJ tool designed for retina layer thickness measurement. By integrating **boundary restoration** and **automated edge verification**, it overcomes segmentation limitations, complemented by an interactive GUI for anatomical boundary editing and targeted layer measurement.
 ## Problem & Motivation：
-As the extension of the central nervous system, the retina provides valuable structural information for studying neuroinflammation and neurodegenerative disease. Among various structural quantification metrics, layer thickness is one of the most widely used indicators. However, accurate thickness measurement in histological sections remains challenging due to sample damage, discontinuous cellular distributions, and staining artifacts. RetinaGauge was developed to restore anatomically accurate retinal layer boundaries, increasing the reliability of measurements. 
+As an extension of the central nervous system, the retina provides valuable structural information for studying neuroinflammation and neurodegenerative diseases. Among various structural quantification metrics, layer thickness is one of the most widely used indicators. However, accurate thickness measurement in histological sections remains challenging due to sample damage, discontinuous cellular distributions, and staining artifacts. RetinaGauge was developed to restore anatomically accurate retinal layer boundaries, increasing the reliability of measurements. 
 ## Method Overview 
-RetinaGauge estimates retinal layer thickness by reconstructing anatomically plausible layer boundaries basedon segmentated nuclear mask. The workflow consist of  five major steps:   
-1. **Nuclear Mask Extraction**-Extract the nuclear region within the retinal layer.
-2. **Mask Reconstruction-Restore** continuous layer boundaries from fragmented structures.
-3. **Boundary Review & Region Selection**-Interactively refine reconstructed boundaries and select the target region.
-4. **Centerline Analysis**-Extract Centerline and perform normal valdiation and purning.
+RetinaGauge estimates retinal layer thickness by reconstructing anatomically plausible layer boundaries based on a segmentated nuclear mask. The workflow consists of  five major steps:   
+1. **Nuclear Mask Extraction** - Extract the nuclear region within the retinal layer.
+2. **Mask Reconstruction Restore** - continuous layer boundaries from fragmented structures.
+3. **Boundary Review & Region Selection** - Interactively refine reconstructed boundaries and select the target region.
+4. **Centerline Analysis**-Extract Centerline and perform normal validation and pruning.
 5. **Thickness Measurement**-Measure the local thickness along the validated centerline and generate quantitative outputs.
 <img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />  
 <p align="center"><em><b>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</b></em></p>
 
-## Step-by-step demo  
-### Step 1: Launch the tool 
+## Step-by-step Demo  
+### Step 1: Launch the Tool 
 1. Open Fiji
 2. Go to `Plugins > Macros > Run...`
 3. Select `RetinaLayerGauge_architecture_v6_Github.groovy`
 4. Run > Run or use Ctrl+R (⌘+R on macOS)
-### Step 2: Input image & options  
-1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-out dialog (Fig. 2).
-2.  Set the scale factor if need (Fig 2.).
+### Step 2: Input Image & Options  
+1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-up dialog (Fig. 2).
+2.  Set the scale factor if needed (Fig. 2).
 <p align="left">
   <img src="docs/Fig2Loadimg.jpg" width="350">
 </p>  
@@ -49,10 +49,10 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </p>   
 
 ### Step 5: Boundary Review & Editing  
-1. Click the `Enable Brush`button to active Brush tool.
-   - To connect fragmened boundary use <kbd>Connect Object</kbd>.
-   - To split touching objects use <kbd>Split Object</kbd>.
-   - Brush size can be adjusted by `Brush size slider`.
+1. Click the `Enable Brush` button to activate Brush tool.
+   - To connect fragmented boundaries use <kbd>Connect Object</kbd>.
+   - To split touching objects, use <kbd>Split Object</kbd>.
+   - Brush size can be adjusted using `Brush size` slider.
    - Adjust raw image transparency for better boundary inspection.
 <p align="left">
 <img src="docs/Fig5GUI_brush.png" width="650">
@@ -62,8 +62,8 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </p>   
 
 ### Step 6: Region Selection  
-1. Click the `Enable Wand`button to active Wand tool.  
-   - Click a target region to automatically select the entire region (Fig. 6-Left).  
+1. Click the `Enable Wand` button to activate Wand tool.  
+   - Click a target region to automatically select the entire object (Fig. 6-Left).  
    - Press <kbd>Add</kbd> to add the selected object to the `ROI list` (Fig. 6-Right).
    - To remove object from the list, select it and press <kbd>Delete</kbd>.
    - Return to the Brush mode if further boundary refinement is required.
@@ -77,24 +77,24 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </em>
 </p>  
 
-### Step 7. Output Files
-- By default, RetinaGauge creates an opput folder named after the input image in the same directory as the source image.
+### Step 7: Output Files
+- By default, RetinaGauge creates an output folder named after the input image in the same directory as the input image.
 - The output folder contains the following files:
   1. **Measurement results (.csv)**
        — Contains thickness statistics and quality metrics for each selected region, including mean, minimum, maximum, standard deviation, coefficient of variation (CV), break rate, and roughness.
   2. **Connected-component labeled image (CCL)**
        — Each selected object is assigned a unique label value for identification and downstream analysis.
   3. **Refined nuclear mask**
-       — - The refined binary mask generated after boundary correction and object selection.
+       — The refined binary mask generated after boundary correction and object selection.
 
 ## Example Results 
-After analysis, RetinaGuage displays Results table and ROI Manager in ImageJ.  
+After analysis, RetinaGauge displays the Results table and ROI Manager in ImageJ.  
 The ROI Manager contains three types of ROIs for each selected region:  
   - Object - Boundary contour of the selected layer.
   - reSkeleton - Refined skeleton used for thickness measurement.
   - Skeleton - Original skeleton before pruning and refinement.
 
-The Results table summarizes thickness statistics and quality metrics for each selected region, including mean, minimum, maximum, standard deviation, coefficient of variation (CV), break rate, and roughness.
+The Results table summarizes thickness statistics and quality metrics for each selected region.
 
 <p align="left">
 <img src="docs/Fig7Result2.png" width="500" >
@@ -106,5 +106,5 @@ Yellow contours indicate Object Rois. Red cruves represent the refined measureme
 </em>
 </p>  
 
-
-## Citation
+## Citation 
+If you use RetinaGauge in your research, please cite this GitHub repository.
