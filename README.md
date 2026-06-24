@@ -21,14 +21,23 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 ### Step 2: Input image & options  
 1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-out dialog (Fig. 2).
 2.  Set the scale factor in neeed(Fig 2.).
-<img width="397" height="245" alt="Fig2 Loadimg" src="https://github.com/user-attachments/assets/5b3f8e93-2acc-4691-a264-2ec783f4fae2" />  
+<p align="left">
+  <img src="docs/Fig2 Loadimg.jpg" width="325">
+</p>  
 <p align="center"><em>Figure 2. Dialog for input image.</em></p>  
 
-### Step 3: Determin Nuclear size 
-1.  Draw a line across a repersenttative nuclus to estimate the nuclear diameter(Fig. 3).
+### Step 3: Determine Nuclear size 
+1. Draw a line across a repersenttative nuclus to estimate the nuclear diameter(Fig. 3).
+<p align="left">
+  <img src="docs/Fig3EstimateNuclearSize.jpg" width="450">
+</p>
+
+<p align="center">
+  <em>Figure 3. Estimation of representative nuclear diameter using the Fiji line tool..</em>
+</p>   
+
    > **Why is this required?**  
    > The measured diameter is used to constrain gap repair and mask reconstruction.
-
 
 
 
