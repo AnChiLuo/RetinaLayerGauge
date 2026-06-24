@@ -48,6 +48,16 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
   <em>Figure 4. Fine-tune the threshold value for nuclear segmentation..</em>
 </p>   
 
+### Step 5: Boundary Review & Editing  
+1. Click the `Enable Brush`button to active Brush tool.
+   - To connect fragmened boundary use <kbd>Connect Object</kbd>.
+   - To split touching objects use <kbd>Split Object</kbd>.
+   - Brush size can be adjusted by `Brush size slider`
+   - Adjust raw image transparency for better boundary inspection.
+  <p align="left">
+  <img src="doc">
+
+
 
 
 
