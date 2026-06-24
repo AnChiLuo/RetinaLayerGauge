@@ -10,7 +10,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 4. **Centerline Analysis**-Extract Centerline and perform normal valdiation and purning.
 5. **Thickness Measurement**-Measure the local thickness along the validated centerline and generate quantitative outputs.
 <img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />  
-<p align="center"><em>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</em></p>
+<p align="center"><em><b>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</b></em></p>
 
 ## Step-by-step demo  
 ### Step 1: Launch the tool 
@@ -24,7 +24,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 <p align="left">
   <img src="docs/Fig2Loadimg.jpg" width="350">
 </p>  
-<p align="left"><em>Figure 2. Dialog for input image.</em></p>  
+<p align="left"><em><b>Figure 2. Dialog for input image.</b></em></p>  
 
 ### Step 3: Determine Nuclear size 
 1. Draw a line across a repersenttative nuclus to estimate the nuclear diameter(Fig. 3).
@@ -33,7 +33,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </p>
 
 <p align="leftr">
-  <em>Figure 3. Estimation of representative nuclear diameter using the Fiji line tool..</em>
+  <em><b>Figure 3. Estimation of representative nuclear diameter using the Fiji line tool..</b></em>
 </p>   
 
    > **Why is this required?**  
@@ -45,7 +45,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 </p>
 
 <p align="leftr">
-  <em>Figure 4. Fine-tune the threshold value for nuclear segmentation.</em>
+  <em><b>Figure 4. Fine-tune the threshold value for nuclear segmentation.</b></em>
 </p>   
 
 ### Step 5: Boundary Review & Editing  
@@ -57,16 +57,29 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 <p align="left">
 <img src="docs/Fig5GUI_brush.png" width="650">
 </p>
-<p align="leftr">
-<em>Figure 5. Boundary Review & Editing GUI.</em>
+<p align="left">
+<em><b>Figure 5. Boundary Review & Editing GUI.</b></em>
 </p>   
 
 ### Step 6: Region Selection  
-1. Click the `Enable Wand`button to active Wand tool.
-   - Software will automatically select whole target object after click target region.
-   - Press <kbd>Add</kbd> to add selected object to `ROI list`.
-   - To delete object use <kbd>Delete</kbd>.
-   - You can go back to Brush mode if object boundary need to be fixed.
+1. Click the `Enable Wand`button to active Wand tool.  
+   - Click a target region to automatically select the entire region (Fig. 6-Left).  
+   - Press <kbd>Add</kbd> to add the selected object to the `ROI list` (Fig. 6-Right).
+   - To remove object from the list, select it and press <kbd>Delete</kbd>.
+   - Return to the Brush mode if further boundary refinement is required.
+     
+<p align="left">
+<img src="docs/Fig6GUI_Wand.png" width="500" >
+<img src="docs/Fig7GUI_Wand2.png" width="500">
+</p>
+<p align="left">
+<em><b> Figure 6. Region selection workflow using the Wnad tool.</b><br>  
+&nbsp;&nbsp;<b>Left:</b> Select an object by clicking on the target region.&nbsp;&nbsp;<b>Right:</b> Add selected objects to the ROI list for further processing and analysis.
+</em>
+</p>
+
+
+
 
 
 
