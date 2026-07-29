@@ -1,13 +1,13 @@
 # Retina-layer-Gauge
-**RetinaGauge** is an ImageJ tool designed for retina layer thickness measurement. By integrating **boundary restoration** and **automated edge verification**, it overcomes segmentation limitations, complemented by an interactive GUI for anatomical boundary editing and targeted layer measurement.
+**RetinaGauge** is an ImageJ tool designed for retina layer thickness measurement. It integrates **boundary restoration** and **automated edge verification** to overcome common segmentation limitations. An interactive GUI futher supports anatomical boundary editing and targeted layer measurement.
 ## Problem & Motivation：
 As an extension of the central nervous system, the retina provides valuable structural information for studying neuroinflammation and neurodegenerative diseases. Among various structural quantification metrics, layer thickness is one of the most widely used indicators. However, accurate thickness measurement in histological sections remains challenging due to sample damage, discontinuous cellular distributions, and staining artifacts. RetinaGauge was developed to restore anatomically accurate retinal layer boundaries, increasing the reliability of measurements. 
 ## Method Overview 
 RetinaGauge estimates retinal layer thickness by reconstructing anatomically plausible layer boundaries based on a segmentated nuclear mask. The workflow consists of  five major steps:   
 1. **Nuclear Mask Extraction** - Extract the nuclear region within the retinal layer.
-2. **Mask Reconstruction Restore** - continuous layer boundaries from fragmented structures.
+2. **Boundary Reconstruction** - Restore continuous retinal boundaries by removing gap-blocking nuclei and reconstructing fragmented structures.
 3. **Boundary Review & Region Selection** - Interactively refine reconstructed boundaries and select the target region.
-4. **Centerline Analysis**-Extract Centerline and perform normal validation and pruning.
+4. **Centerline Extraction** -Extract the centerline using Binary Skeleton or Distance Ridge (TopHat), followed by normal validation and pruning.
 5. **Thickness Measurement**-Measure the local thickness along the validated centerline and generate quantitative outputs.
 <img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />  
 <p align="center"><em><b>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</b></em></p>
@@ -28,7 +28,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 7.  Click **OK** to contunue.
 8.  Set the scale factor if needed (Fig. 2).
 <p align="left">
-  <img src="docs/Fig2 NewLoadimg.png" width="350">
+  <img src="docs/Fig2NewLoadimg.png" width="350">
 </p>  
 <p align="left"><em><b>Figure 2. Dialog for input image.</b></em></p>  
 
