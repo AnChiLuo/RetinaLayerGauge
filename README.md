@@ -20,9 +20,15 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 4. Run > Run or use Ctrl+R (⌘+R on macOS)
 ### Step 2: Input Image & Options  
 1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-up dialog (Fig. 2).
-2.  Set the scale factor if needed (Fig. 2).
+2.  Enter the estimated nuclear diameter (optional).Set it to **0** if you prefer to measure it manually later.
+3.  Choose a nuclear dectoin method.
+4.  Enable or disable **Gap refinement**.
+5.  Select the centerline detection method.
+6.  Verify the image scale if necessary.
+7.  Click **OK** to contunue.
+8.  Set the scale factor if needed (Fig. 2).
 <p align="left">
-  <img src="docs/Fig2Loadimg.jpg" width="350">
+  <img src="docs/Fig2 NewLoadimg.png" width="350">
 </p>  
 <p align="left"><em><b>Figure 2. Dialog for input image.</b></em></p>  
 
