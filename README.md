@@ -1,5 +1,5 @@
 # Retina-layer-Gauge
-**RetinaGauge** is an ImageJ tool designed for retina layer thickness measurement. It integrates **boundary restoration** and **automated edge verification** to overcome common segmentation limitations. An interactive GUI futher supports anatomical boundary editing and targeted layer measurement.
+**RetinaGauge** is an ImageJ tool designed for retina layer thickness measurement. It integrates **boundary restoration** and **automated edge verification** to overcome common segmentation limitations. An interactive GUI further supports anatomical boundary editing and targeted layer measurement.
 ## Problem & Motivation：
 As an extension of the central nervous system, the retina provides valuable structural information for studying neuroinflammation and neurodegenerative diseases. Among various structural quantification metrics, layer thickness is one of the most widely used indicators. However, accurate thickness measurement in histological sections remains challenging due to sample damage, discontinuous cellular distributions, and staining artifacts. RetinaGauge was developed to restore anatomically accurate retinal layer boundaries, increasing the reliability of measurements. 
 ## Method Overview 
