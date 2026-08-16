@@ -38,7 +38,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 ### Step 3: Determine Nuclear size 
 1. Draw a line across a repersenttative nuclus to estimate the nuclear diameter(Fig. 3).
 <p align="left">
-  <img src="docs/Fig3_FetchncDia.png" width="450">
+  <img src="docs/Fig3_FetchncDIa.png" width="450">
 </p>
 
 <p align="leftr">
@@ -50,7 +50,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 ### Step 4: Threshold the image and create mask  
 1. You will be asked to confirm the threshold used for nuclear mask generation.
 <p align="left">
-  <img src="docs/Fig4Threshold.jpg" width="550">
+  <img src="docs/Fig4_ManuallyThreshold.png" width="691">
 </p>
 
 <p align="leftr">
@@ -64,7 +64,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
    - Brush size can be adjusted using `Brush size` slider.
    - Adjust raw image transparency for better boundary inspection.
 <p align="left">
-<img src="docs/Fig5GUI_brush.png" width="650">
+<img src="docs/Fig5_ManuallyRepair.png" width="795">
 </p>
 <p align="left">
 <em><b>Figure 5. Boundary Review & Editing GUI.</b></em>
@@ -78,7 +78,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
    - Return to the Brush mode if further boundary refinement is required.
      
 <p align="left">
-<img src="docs/Fig6GUI_Wand.jpg" width="1000" >
+<img src="docs/Fig6_wandTool.png" width="1000" >
 </p>
 <p align="left">
 <em><b> Figure 6. Region selection workflow using the Wnad tool.</b><br>  
@@ -106,7 +106,7 @@ The ROI Manager contains three types of ROIs for each selected region:
 The Results table summarizes thickness statistics and quality metrics for each selected region.
 
 <p align="left">
-<img src="docs/Fig7Result2.png" width="500" >
+<img src="docs/Fig7_result.png" width="815" >
 </p>
 <p align="left">
 <p align="left">
