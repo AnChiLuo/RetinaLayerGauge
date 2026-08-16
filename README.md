@@ -29,15 +29,16 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 8.  Verify the image scale if necessary.
 9.  Click **OK** to contunue.
 10.  Set the scale factor if needed (Fig. 2).
-<p align="left">
-  <img src="docs/Fig2_newDialog-Setting.png" width="350">
-</p>  
-<p align="left"><em><b>Figure 2. Dialog for input image.</b></em></p>  
+
+| Input and preprocessing settings | Centerline and scale settings |
+|---|---|
+| ![](docs/Fig2_newDialog-SettingA.png) | ![](docs/Fig2_newDialog-SettingB.png) |
+<p align="left"><em><b>Figure 2. Setup dialog for input image and analysis options.</b></em></p>  
 
 ### Step 3: Determine Nuclear size 
 1. Draw a line across a repersenttative nuclus to estimate the nuclear diameter(Fig. 3).
 <p align="left">
-  <img src="docs/Fig3EstimateNuclearSize.jpg" width="450">
+  <img src="docs/Fig3_FetchncDia.png" width="450">
 </p>
 
 <p align="leftr">
