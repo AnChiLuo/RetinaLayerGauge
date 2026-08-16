@@ -9,7 +9,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 3. **Boundary Review & Region Selection** - Interactively refine reconstructed boundaries and select the target region.
 4. **Centerline Extraction** -Extract the centerline using Binary Skeleton or Distance Ridge (TopHat), followed by normal validation and pruning.
 5. **Thickness Measurement**-Measure the local thickness along the validated centerline and generate quantitative outputs.
-<img width="1696" height="462" alt="WorkFlow" src="https://github.com/user-attachments/assets/3a3e719b-e2e4-4007-ab9c-ed736101606a" />  
+<img width="1696" height="462" alt="WorkFlow" src="docs/Fig1_workFlow.png"/>  
 <p align="center"><em><b>Figure 1. RetinaGauge workflow for retinal layer thickness measurement.</b></em></p>
 
 ## Step-by-step Demo  
