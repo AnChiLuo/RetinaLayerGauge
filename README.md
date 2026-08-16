@@ -115,5 +115,8 @@ Yellow contours indicate Object Rois. Red cruves represent the refined measureme
 </em>
 </p>  
 
+## Demo Image
+The demo image included with RetinaLayerGauge was obtained from the Image Data Resource (IDR), study idr0018: Histopathology of mouse knockouts, Image ID 1919526, and is used under the CC BY 4.0 license. The image is provided as example data for demonstrating the RetinaLayerGauge workflow.
+
 ## Citation 
 If you use RetinaGauge in your research, please cite this GitHub repository.
