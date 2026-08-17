@@ -16,7 +16,7 @@ RetinaGauge estimates retinal layer thickness by reconstructing anatomically pla
 ### Step 1: Launch the Tool 
 1. Open Fiji
 2. Go to `Plugins > Macros > Run...`
-3. Select `RetinaLayerGauge_architecture_v6_Github.groovy`
+3. Select `RetinaLayerGauge_architecture_v12_Github.groovy`
 4. Run > Run or use Ctrl+R (⌘+R on macOS)
 ### Step 2: Input Image & Options  
 1.  Select images for each dataset by using <kbd>Browse</kbd> on the pop-up dialog (Fig. 2).
