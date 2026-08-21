@@ -3,10 +3,11 @@
 RetinaLayerGauge
 Retinal Histology Thickness Quantification Toolkit
 
-Version : v12.0.0
+Version : 1.1.0
 Author  : An-Chi Luo
 Affiliation  : Imaging Core Facility, College of Medicine, National Taiwan University
-Data: 2026/08/12
+Data: 2026/08/21 05:17 PM
+Related to : RetinaLayerGauge_architecture_V14_Github
 
 Main Workflow
 -------------
@@ -35,6 +36,10 @@ import sc.fiji.analyzeSkeleton.AnalyzeSkeleton_
 import java.util.List
 import java.nio.file.*
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.FileWriter
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 // --- [GUI 介面組件 (Swing/AWT)] ---
 import javax.swing.*
@@ -97,16 +102,25 @@ def main() {
         prepareAndAnalysisFeatures(ctx)
 
         //7. Data visualisation and saving
-        visualiseData(ctx)
+        AnalysisOutputSaver outputSaver = new AnalysisOutputSaver(ctx)
+        outputSaver.visualiseDataSaver()
+        outputSaver.metaDataSaver()
+
     } catch (Throwable e) {
-        // 印出明確錯誤訊息到 Console）
-        IJ.log(" 腳本執行中斷或發生錯誤: " + e.toString())
-        throw e
+        String msg = e.getMessage()?:""
+        if(msg.startsWith("[User]")){
+            IJ.log(msg.replace("[User]", ""))
+            IJ.log("Pipeline terminated. Please restart the analysis.")
+        } else{
+            IJ.log("Script interrupted or execution failed" + e.toString())
+            throw e
+        }
+
     }
     finally {
         if (Interpreter.batchMode) {
             Interpreter.batchMode = false
-            println "[System] Batch mode safely disabled."
+            IJ.log("[System] Batch mode safely disabled.")
         }
     }
 
@@ -131,6 +145,7 @@ class PipelineContext {
     private boolean GapRefine
     private String stainMode
     private double MaxGapFactor
+    private double NucleiThreshold
 
 
     PipelineContext(ImagePlus colorImg){
@@ -161,6 +176,9 @@ class PipelineContext {
         this.GapRefine = GapRefine
     }
 
+    void setNucleiThreshold(double minThreshold){
+        this.NucleiThreshold = minThreshold
+    }
 
     RoiStore getRoiStore(){ return roiStore }
     ImageTracker getImgTracker() {return tracker}
@@ -173,6 +191,7 @@ class PipelineContext {
     boolean getGapRefine() {return GapRefine}
     String getStainMode() {return stainMode}
     double getMaxGapF(){return MaxGapFactor}
+    double getNucleiThreshold(){return NucleiThreshold}
 }
 /**
  *ImageTracker: 影像生命週期管理與副作用追蹤器
@@ -218,7 +237,6 @@ class ImageTracker{
         // 處理 顯式回傳的物件 (支援 Map, List, 單一物件)
         def items = ( created instanceof Map)? created.values() : [created]
         result.addAll(items.flatten().grep(ImagePlus) as Collection<ImagePlus>)
-        //[items].flatten().each{it -> if(it instanceof ImagePlus){result.add(it)}}
         if(addTrack){
             result.each{imp->
                 TagImpAsTrash(imp)
@@ -461,10 +479,10 @@ class ObjectItem {
      * @return thickness statistics and quality metrics
      */
     Map<String, Double> getThicknessAnalysis(double ncuDia, double scale = 1.0, String unit = "px"){
-        String mean = "mean(${unit})"
-        String min = "min(${unit})"
-        String max = "max(${unit})"
-        String stdDev = "stdDev(${unit})"
+        String mean = "meanThickness(${unit})"
+        String min = "minThickness(${unit})"
+        String max = "maxThickness(${unit})"
+        String stdDev = "stdDevThickness(${unit})"
 
         if (! thicknessProfile) {
             return [ (mean): Double.NaN, (min): Double.NaN, (max): Double.NaN, (stdDev): Double.NaN,
@@ -551,22 +569,18 @@ class NucleiChannelExtractor {
         ImagePlus nucleiImp = tracker.pickBySuffix(create, "(Colour_1)")
         tracker.cleanupByLifeCycle(true, [Imp, nucleiImp])
         String PPFilter = Imp.getProperty("PPMethod")
-        Interpreter.batchMode = false
-        nucleiImp.show()
-        Dialog dialog = new WaitForUserDialog("Check deconvolution ", "Check deconvolution")
-        dialog.show()
-
 
         // --- Step 2: Signal Enhancement using FFT ---
         ImagePlus enhancedNuclei = tracker.runAndReturn({
             NucleusExtractorOps.EnhanceNucleiWithFilter(nucleiImp, ncuDia, PPFilter)}) as ImagePlus
 
         if(batchMode) {Interpreter.batchMode = false}
-        NucleusExtractorOps.askThreshold(enhancedNuclei, "Triangle dark")
+        double minThreshold = NucleusExtractorOps.askThreshold(enhancedNuclei, "Triangle dark")
         if(batchMode) {Interpreter.batchMode = true}
 
         ImagePlus nucleiMask = tracker.runAndReturn({
             NucleusExtractorOps.convertNucleiToMask(enhancedNuclei)}) as ImagePlus
+        nucleiMask.setProperty("MinThreshold", minThreshold)
 
         tracker.cleanupByLifeCycle(true, [Imp, nucleiMask])
         return nucleiMask
@@ -599,7 +613,7 @@ class NucleusExtractorOps {
         return enhancedNuclei
     }
 
-    static void askThreshold(ImagePlus imp, String defaultMethod){
+    static double askThreshold(ImagePlus imp, String defaultMethod){
         ImageProcessor temp = imp.getProcessor()
         temp.setAutoThreshold(defaultMethod)
         imp.show()
@@ -611,6 +625,7 @@ class NucleusExtractorOps {
             dialog.show()
         }
         while(!imp.isThreshold())
+        return temp.getMinThreshold()
     }
 
     static ImagePlus convertNucleiToMask(ImagePlus enhancedImp, showResult = false){
@@ -649,32 +664,38 @@ class ExtractGapRegionStep {
             tracker.cleanupByLifeCycle(false, [cleanGap, reSizeCleanGap, LocThk2, Imp])
             Roi[] outlierNc = removeGapBlockingNucleiStep(LocThk2, reSizeCleanGap, ncDia * ScaleF)
             if( ScaleF != 1){
-                //Fetch the nuclei ROI from Full Size Img
                 double maxSize = (ncDia * 0.5) * (ncDia * 0.5) * Math.PI * 5
-                RoiManager FullSizeRM = RoiManager.getInstance() ?: new RoiManager(false)
+                RoiManager FullSizeRM =  new RoiManager(false)
                 int opts = ParticleAnalyzer.ADD_TO_MANAGER
                 ParticleAnalyzer.setRoiManager(FullSizeRM)
-                def FullSizePA = new ParticleAnalyzer(opts, 0, new ResultsTable(), 0, maxSize, 0.0, 1.0)
-                cleanGap.getProcessor().setThreshold(255, 255, ImageProcessor.NO_LUT_UPDATE)
-                FullSizePA.analyze(cleanGap)
-                Roi[] FullSizeNcRois = FullSizeRM.getRoisAsArray()
+                try{
+                    //Fetch the nuclei ROI from Full Size Img
+                    def FullSizePA = new ParticleAnalyzer(opts, 0, new ResultsTable(), 0, maxSize, 0.0, 1.0)
+                    cleanGap.getProcessor().setThreshold(255, 255, ImageProcessor.NO_LUT_UPDATE)
+                    FullSizePA.analyze(cleanGap)
+                    Roi[] FullSizeNcRois = FullSizeRM.getRoisAsArray()
 
-                //Lookup outlierNc from FullSizeNcRois
-                List<Roi> FsOutlierNc = []
-                for( Roi fullSizeRoi : FullSizeNcRois){
-                    for (Roi roi : outlierNc){
-                        double dsXc = roi.getStatistics().xCentroid
-                        double dsYc = roi.getStatistics().yCentroid
-                        if (fullSizeRoi.containsPoint(dsXc / ScaleF, dsYc / ScaleF)){
-                            FsOutlierNc << fullSizeRoi
-                            break
+                    //Lookup outlierNc from FullSizeNcRois
+                    List<Roi> FsOutlierNc = []
+                    for( Roi fullSizeRoi : FullSizeNcRois){
+                        for (Roi roi : outlierNc){
+                            double dsXc = roi.getStatistics().xCentroid
+                            double dsYc = roi.getStatistics().yCentroid
+                            if (fullSizeRoi.containsPoint(dsXc / ScaleF, dsYc / ScaleF)){
+                                FsOutlierNc << fullSizeRoi
+                                break
+                            }
                         }
                     }
+                    if (outlierNc.length > 0 && FsOutlierNc.isEmpty()) {
+                        IJ.log("Warning: No full-size ROI matched.")
+                    }
+                    outlierNc = FsOutlierNc as Roi[]}
+                finally{
+                    ParticleAnalyzer.setRoiManager(null)
+                    FullSizeRM.reset()
+                    FullSizeRM.close()
                 }
-                if (outlierNc.length > 0 && FsOutlierNc.isEmpty()) {
-                    IJ.log("Warning: No full-size ROI matched.")
-                }
-                outlierNc = FsOutlierNc as Roi[]
             }
             tracker.cleanupByLifeCycle(false, [cleanGap, Imp])
 
@@ -722,7 +743,7 @@ class ExtractGapRegionStep {
         return CL
     }
 
-     Map<String, Object> downSampling(ImagePlus rawMask, double ncDia){
+    Map<String, Object> downSampling(ImagePlus rawMask, double ncDia){
         int longSide = Math.max(rawMask.height, rawMask.width)
         double ScaleF = 2048/longSide
         double ScaleNcDia = ncDia * ScaleF
@@ -757,159 +778,165 @@ class ExtractGapRegionStep {
         MaskLocThkFp.fill(AllNucleiRoi)
         MaskLocThk.setProcessor("MaskLocThk",MaskLocThkFp)
 
-
         //Preparation: Fetch the candidateRoi
         ImageProcessor RawImp = RawImg.getProcessor()
+        RoiManager OutlierNcRM = null
         double maxSize = (ncDia * 0.5) * (ncDia * 0.5) * Math.PI * 5
-        RoiManager RawNcRM = RoiManager.getInstance() ?: new RoiManager(false)
-        RawNcRM.reset()
+        RoiManager RawNcRM =  new RoiManager(false)
         int opts = ParticleAnalyzer.ADD_TO_MANAGER
         ParticleAnalyzer.setRoiManager(RawNcRM)
-        def singleNcPicker = new ParticleAnalyzer(opts, 0, new ResultsTable(), 0, maxSize, 0.0, 1.0)
-        RawImp.setThreshold(255, 255, ImageProcessor.NO_LUT_UPDATE)
-        singleNcPicker.analyze(RawImg)
 
-        //Check each roi
-        List<Roi> ExtRoi = new ArrayList<Roi>()
-        ImageStatistics ExpandStat
-        RoiManager OutlierNcRM = new RoiManager(false)
-        Roi[] rawNcRois = RawNcRM.getRoisAsArray()
+        try{
+            def singleNcPicker = new ParticleAnalyzer(opts, 0, new ResultsTable(), 0, maxSize, 0.0, 1.0)
+            RawImp.setThreshold(255, 255, ImageProcessor.NO_LUT_UPDATE)
+            singleNcPicker.analyze(RawImg)
 
-        Overlay overlay = new Overlay()
-        for (int roi = 0; roi < rawNcRois.length; roi++) {
-            Roi ExpandNc = RoiEnlarger.enlarge(rawNcRois[roi], 2)
-            ExpandNc.setImage(MaskLocThk)
-            ExpandStat = ExpandNc.getStatistics()
-            if (ExpandStat.max < 2.2 * ncDia || ExpandStat.area == 0) continue
-            //region
-            else if (ExpandStat.max == 6 * ncDia && ExpandStat.min == 6 *ncDia ){
-                rawNcRois[roi].setStrokeColor(Color.RED)
-                OutlierNcRM.addRoi(rawNcRois[roi])
-                continue
-            }
-            overlay.add((Roi) ExpandNc.clone())
+            //Check each roi
+            List<Roi> ExtRoi = new ArrayList<Roi>()
+            ImageStatistics ExpandStat
+             OutlierNcRM = new RoiManager(false)
+            Roi[] rawNcRois = RawNcRM.getRoisAsArray()
 
+            Overlay overlay = new Overlay()
+            for (int roi = 0; roi < rawNcRois.length; roi++) {
+                Roi ExpandNc = RoiEnlarger.enlarge(rawNcRois[roi], 2)
+                ExpandNc.setImage(MaskLocThk)
+                ExpandStat = ExpandNc.getStatistics()
+                if (ExpandStat.max < 2.2 * ncDia || ExpandStat.area == 0) continue
+                //region
+                else if (ExpandStat.max == 6 * ncDia && ExpandStat.min == 6 *ncDia ){
+                    rawNcRois[roi].setStrokeColor(Color.RED)
+                    OutlierNcRM.addRoi(rawNcRois[roi])
+                    continue
+                }
+                overlay.add((Roi) ExpandNc.clone())
+                //endregion
 
-            //endregion
+                double[] rawFeret = rawNcRois[roi].getFeretValues()
+                double searchR = (rawFeret[0] + rawFeret[2]) * 0.5 + ExpandStat.mean
+                double Xc = rawNcRois[roi].getStatistics().xCentroid
+                double Yc = rawNcRois[roi].getStatistics().yCentroid
+                double[] Pcen = [Xc, Yc] as double[]
 
+                //Radius search outlier
+                ArrayList <Boolean> outlierAng =  new ArrayList<Boolean>()
+                ArrayList <Boolean> gclAng =  new ArrayList<Boolean>()
+                int validaCurrentRun = 0
+                int validaMaxRun = 0
+                int validaGCLcurrentRun = 0
+                int validaGCLmaxRun = 0
 
-            double[] rawFeret = rawNcRois[roi].getFeretValues()
-            double searchR = (rawFeret[0] + rawFeret[2]) * 0.5 + ExpandStat.mean
-            double Xc = rawNcRois[roi].getStatistics().xCentroid
-            double Yc = rawNcRois[roi].getStatistics().yCentroid
-            double[] Pcen = [Xc, Yc] as double[]
+                for (int angle = 0; angle < 180; angle += 5) {
+                    double rad = angle * Math.PI / 180
+                    ArrayList<Boolean> isOutlier = new ArrayList<Boolean>()
+                    ArrayList<Boolean> isGCLs = new ArrayList<Boolean>()
+                    List<Roi> RadiusOutlier = new ArrayList<Roi>()
+                    List<Roi> outlierRay = new ArrayList<Roi>()
+                    Boolean isOutliers = true
+                    Boolean bothGCL = true
 
-            //Radius search outlier
-            ArrayList <Boolean> outlierAng =  new ArrayList<Boolean>()
-            ArrayList <Boolean> gclAng =  new ArrayList<Boolean>()
-            int validaCurrentRun = 0
-            int validaMaxRun = 0
-            int validaGCLcurrentRun = 0
-            int validaGCLmaxRun = 0
-
-            for (int angle = 0; angle < 180; angle += 5) {
-                double rad = angle * Math.PI / 180
-                ArrayList<Boolean> isOutlier = new ArrayList<Boolean>()
-                ArrayList<Boolean> isGCLs = new ArrayList<Boolean>()
-                List<Roi> RadiusOutlier = new ArrayList<Roi>()
-                List<Roi> outlierRay = new ArrayList<Roi>()
-                Boolean isOutliers = true
-                Boolean bothGCL = true
-
-                for (r in [rad, rad + Math.PI]) {
-                    //if (isOutlier.contains(false)) break
-                    def radiusCheck  = RadiusValidator(MaskLocThkFp, Pcen, r, searchR, ncDia, 1.5)
-                    RadiusOutlier << radiusCheck.Roi
-                    //延伸檢查，延伸 0.5X 搜尋半徑
-                    bothGCL &= radiusCheck.isGCL
-                    if(radiusCheck.outlier == true) {
-                        isOutliers &= radiusCheck.outlier
-                        double [] PextS = radiusCheck.PrefEnd as double []
-                        def LineExt = new Line(Pcen[0], Pcen[1], PextS[0], PextS[1])
-                        LineExt.setStrokeColor(Color.YELLOW)
-                        outlierRay << LineExt
-                        isOutlier << true}
-
-                    /*
-                    else if (radiusCheck.outlier == false && radiusCheck.isTrim == false){
-                        double [] PextS = radiusCheck.PrefEnd as double []
-                        def radiusCheck2nd  = RadiusValidator(MaskLocThkFp, PextS, r, searchR * 0.5, ncDia, 2)
-                        isOutliers &= radiusCheck2nd.outlier
-                        if(radiusCheck2nd.outlier == true) {
-                            double [] newEND = radiusCheck2nd.PrefEnd as double []
-                            def LineExt = new Line(Pcen[0], Pcen[1], newEND[0], newEND[1])
-                            LineExt.setStrokeColor(Color.RED)
+                    for (r in [rad, rad + Math.PI]) {
+                        //if (isOutlier.contains(false)) break
+                        def radiusCheck  = RadiusValidator(MaskLocThkFp, Pcen, r, searchR, ncDia, 1.5)
+                        RadiusOutlier << radiusCheck.Roi
+                        //延伸檢查，延伸 0.5X 搜尋半徑
+                        bothGCL &= radiusCheck.isGCL
+                        if(radiusCheck.outlier == true) {
+                            isOutliers &= radiusCheck.outlier
+                            double [] PextS = radiusCheck.PrefEnd as double []
+                            def LineExt = new Line(Pcen[0], Pcen[1], PextS[0], PextS[1])
+                            LineExt.setStrokeColor(Color.YELLOW)
                             outlierRay << LineExt
-                            isOutlier << true
-                            IJ.log("ID_${roi} , IsOutlier: ${isOutlier} 759, ISOutlier: ${isOutliers}")
-                        }
-                        else{isOutlier << false}
-                    }
-                    */
+                            isOutlier << true}
 
-                    else if (radiusCheck.outlier == false ) {
-                        isOutliers &= radiusCheck.outlier
-                        isOutlier << false}
-                    boolean isGCL = radiusCheck.isGCL
-                    isGCLs << isGCL
-                }
-                if(DEBUG_OUTLIER){
-                    if (isOutlier == [true, true]) {
-                        if( isGCLs != [true, true]) {
-                            RawNcRM.addRoi(RadiusOutlier[0])
-                            RawNcRM.addRoi(RadiusOutlier[1])
+                        /*
+                        else if (radiusCheck.outlier == false && radiusCheck.isTrim == false){
+                            double [] PextS = radiusCheck.PrefEnd as double []
+                            def radiusCheck2nd  = RadiusValidator(MaskLocThkFp, PextS, r, searchR * 0.5, ncDia, 2)
+                            isOutliers &= radiusCheck2nd.outlier
+                            if(radiusCheck2nd.outlier == true) {
+                                double [] newEND = radiusCheck2nd.PrefEnd as double []
+                                def LineExt = new Line(Pcen[0], Pcen[1], newEND[0], newEND[1])
+                                LineExt.setStrokeColor(Color.RED)
+                                outlierRay << LineExt
+                                isOutlier << true
+                                IJ.log("ID_${roi} , IsOutlier: ${isOutlier} 759, ISOutlier: ${isOutliers}")
+                            }
+                            else{isOutlier << false}
                         }
-                        //region for Debug
-                        RawNcRM.addRoi(outlierRay[0])
-                        RawNcRM.addRoi(outlierRay[1])
-                        //endregion
+                        */
+
+                        else if (radiusCheck.outlier == false ) {
+                            isOutliers &= radiusCheck.outlier
+                            isOutlier << false}
+                        boolean isGCL = radiusCheck.isGCL
+                        isGCLs << isGCL
                     }
-                    if (isGCLs == [true, true]){
+                    if(DEBUG_OUTLIER){
                         if (isOutlier == [true, true]) {
-                            RawNcRM.addRoi(RadiusOutlier[0])
-                            RawNcRM.addRoi(RadiusOutlier[1])
+                            if( isGCLs != [true, true]) {
+                                RawNcRM.addRoi(RadiusOutlier[0])
+                                RawNcRM.addRoi(RadiusOutlier[1])
+                            }
+                            //region for Debug
+                            RawNcRM.addRoi(outlierRay[0])
+                            RawNcRM.addRoi(outlierRay[1])
+                            //endregion
                         }
+                        if (isGCLs == [true, true]){
+                            if (isOutlier == [true, true]) {
+                                RawNcRM.addRoi(RadiusOutlier[0])
+                                RawNcRM.addRoi(RadiusOutlier[1])
+                            }
 
+                        }
                     }
+
+                    outlierAng << isOutliers
+                    gclAng << bothGCL
+
                 }
+                def validaOutlier = outlierAng + outlierAng
+                def validaGCL = gclAng + gclAng
 
-                outlierAng << isOutliers
-                gclAng << bothGCL
-
-            }
-            def validaOutlier = outlierAng + outlierAng
-            def validaGCL = gclAng + gclAng
-
-            for (int v = 0; v < 72; v++){
-                if (validaOutlier[v] == true) {
-                    validaCurrentRun++
-                    if (validaCurrentRun > validaMaxRun) {
-                        validaMaxRun = validaCurrentRun
-                    }
-                } else {
-                    validaCurrentRun =0
+                for (int v = 0; v < 72; v++){
+                    if (validaOutlier[v] == true) {
+                        validaCurrentRun++
+                        if (validaCurrentRun > validaMaxRun) {
+                            validaMaxRun = validaCurrentRun
+                        }
+                    } else {
+                        validaCurrentRun =0
                     }
 
-                if(validaGCL[v] == true){
-                    validaGCLcurrentRun++
-                    if(validaGCLcurrentRun > validaGCLmaxRun) {
-                        validaGCLmaxRun = validaGCLcurrentRun}
-                } else {
+                    if(validaGCL[v] == true){
+                        validaGCLcurrentRun++
+                        if(validaGCLcurrentRun > validaGCLmaxRun) {
+                            validaGCLmaxRun = validaGCLcurrentRun}
+                    } else {
                         validaGCLcurrentRun =0
                     }
 
-            }
-            validaMaxRun = Math.min(validaMaxRun, outlierAng.size())
-            validaGCLmaxRun = Math.min(validaGCLmaxRun, gclAng.size())
+                }
+                validaMaxRun = Math.min(validaMaxRun, outlierAng.size())
+                validaGCLmaxRun = Math.min(validaGCLmaxRun, gclAng.size())
 
-            if (validaMaxRun >= 5 && validaGCLmaxRun <= 10) {
-                rawNcRois[roi].setStrokeColor(Color.RED)
-                OutlierNcRM.addRoi(rawNcRois[roi])
+                if (validaMaxRun >= 5 && validaGCLmaxRun <= 10) {
+                    rawNcRois[roi].setStrokeColor(Color.RED)
+                    OutlierNcRM.addRoi(rawNcRois[roi])
+                }
             }
+            MaskLocThk.setOverlay(overlay)
+            MaskLocThk.show()
+            return OutlierNcRM.getRoisAsArray()
         }
-        MaskLocThk.setOverlay(overlay)
-        MaskLocThk.show()
-        return OutlierNcRM.getRoisAsArray()
+        finally{
+            ParticleAnalyzer.setRoiManager(null)
+            RawNcRM?.reset()
+            RawNcRM?.close()
+            OutlierNcRM?.reset()
+            OutlierNcRM?.close()
+        }
     }
 
 
@@ -967,19 +994,21 @@ class ExtractGapRegionStep {
         //region_6D search
         double[] PgclRay = [Pstart[0] + ncDia * 6 * Math.cos(r), Pstart[1] + ncDia * 6 * Math.sin(r)]
         double[] GclRayRefind = refinePend(PgclRay[0], PgclRay[1], Pstart[0], Pstart[1], MaskLocThkFp.width, MaskLocThkFp.height)
-        double[] gclRay =  MaskLocThkFp.getLine(Pstart[0], Pstart[1], PgclRay[0], PgclRay[1])
+
         if(PgclRay[0] != GclRayRefind [0] || PgclRay[1] != GclRayRefind [1]){
             isGCL = true
-        }
-        List<Double> rayEnd = gclRay[-3..-1]
-        LineExt = new Line(Pstart[0], Pstart[1], PgclRay[0], PgclRay[1])
-        LineExt.setStrokeColor(Color.BLUE)
-        if(rayEnd.min() > 6 * ncDia -1) {
-            LineExt.setStrokeColor(Color.GREEN)
-            isGCL = true
+            // A 6D ray reaching the image boundary is treated as a GCL case, since outlier status cannot be reliably determined.
+        } else{
+            double[] gclRay =  MaskLocThkFp.getLine(Pstart[0], Pstart[1], PgclRay[0], PgclRay[1])
+            List<Double> rayEnd = gclRay[-3..-1]
+            //LineExt = new Line(Pstart[0], Pstart[1], PgclRay[0], PgclRay[1])
+            //LineExt.setStrokeColor(Color.BLUE)
+            if(rayEnd.min() > 6 * ncDia -1) {
+                //LineExt.setStrokeColor(Color.GREEN)
+                isGCL = true
+            }
         }
         //endregion_6D search
-
         RadiusMean = RadiusMean / nonNaN
         if( RadiusMean < ncDia * tolerance){
             outlier = false
@@ -1002,9 +1031,6 @@ class ExtractGapRegionStep {
             if( Double.isNaN(Line[0])) {
                 outlier = !isTrim
             }
-
-
-
 
         }
         return [PrefEnd: RefinePend, outlier: outlier, isTrim: isTrim, isGCL: isGCL, Roi: LineExt]
@@ -1054,6 +1080,7 @@ class GapConnectivityStep{
             ImagePlus erodeMask = buildErodeConnectivity(gapRegionMask, nucleiMask, ncuDia)
             ImagePlus skeletonMask = buildSkeletonConnectivity(gapRegionMask, nucleiMask, ncuDia)
             ImagePlus refinedMask = refineMaskswithWegiht(erodeMask, skeletonMask, weight, output)
+            fillHoleWithCriteria(refinedMask, 1, Double.POSITIVE_INFINITY, 0.7, 1)
             return [erode: erodeMask, skeleton: skeletonMask, refined: refinedMask]
         }
         ) as Map<String, ImagePlus>
@@ -1073,7 +1100,8 @@ class GapConnectivityStep{
         ImagePlus erodeMask = new ImageCalculator().run(erodeGap, nucleiMask,"Add create")
         binaryFilter.setup("close", erodeMask)
         binaryFilter.run(erodeMask.getProcessor())
-        fillHoleWithSize(erodeMask, ncuDia)
+        double maxHoleSize = 1.5 * ncuDia * ncuDia
+        fillHoleWithCriteria(erodeMask, 1.0, maxHoleSize, 0.0, 1.0)
         erodeMask.setTitle("erodeMask")
         return erodeMask
     }
@@ -1086,7 +1114,8 @@ class GapConnectivityStep{
         ImagePlus skeletonMask = new ImageCalculator().run(gapRegionMask, nucleiMask, "Add create")
         binaryFilter.setup("close", skeletonMask)
         binaryFilter.run(skeletonMask.getProcessor())
-        fillHoleWithSize(skeletonMask, ncuDia)
+        double maxHoleSize = 1.5 * ncuDia * ncuDia
+        fillHoleWithCriteria(skeletonMask, 1.0, maxHoleSize, 0.0, 1.0)
         skeletonMask.setTitle("skeletonMask")
         return skeletonMask
     }
@@ -1111,19 +1140,27 @@ class GapConnectivityStep{
         return combineEDM
     }
 
-    private static fillHoleWithSize(ImagePlus Imp, double ncuDia){
-        Imp.getProcessor().invert()
-        def rm = RoiManager.getInstance2() ?: new RoiManager(false)
-        rm.reset()
-        ///Set selection parameter for ParticleAnalyzer
-        int opts = ParticleAnalyzer.ADD_TO_MANAGER
-        int meas = 0
-        double maxSize = 1.5 * ncuDia * ncuDia
-        def SizeFilter = new ParticleAnalyzer(opts, meas, new ResultsTable(),1, maxSize, 0.0, 1.0)
-        SizeFilter.analyze(Imp)
-        rm.runCommand(Imp, "Fill")
-        Imp.getProcessor().invert()
-        rm.reset()
+    private static fillHoleWithCriteria(ImagePlus Imp , double minSize, double maxSize, double minCir, double maxCir){
+        ImageProcessor ip = Imp.getProcessor()
+        ip.setThreshold(0,0,ImageProcessor.NO_LUT_UPDATE)
+        def rm_FH = new RoiManager(false)
+        ParticleAnalyzer.setRoiManager(rm_FH)
+        try{
+            ///Set selection parameter for ParticleAnalyzer
+            int opts = ParticleAnalyzer.ADD_TO_MANAGER
+            int meas = 0
+            def HoleFilter = new ParticleAnalyzer(opts, meas, new ResultsTable(), minSize, maxSize, minCir, maxCir)
+            HoleFilter.analyze(Imp)
+            ip.setValue(255)
+            rm_FH.getRoisAsArray().each { roi ->
+                ip.fill(roi)
+            }
+        }finally {
+            ParticleAnalyzer.setRoiManager(null)
+            rm_FH.reset()
+            rm_FH.close()
+            ip.resetThreshold()
+        }
     }
 
     private static multiplyImp(ImagePlus Imp, double weight) {
@@ -1278,6 +1315,7 @@ class RetinaSpatialOps{
         ImagePlus roiSkeletonImp = objMaskImp.duplicate()
         if(CLMethod == "Binary Skeleton") {
             IJ.run(roiSkeletonImp, "Skeletonize (2D/3D)", "")
+            IJ.log("CLMethod == Binary Skeleton")
 
         }
         else{
@@ -1293,6 +1331,7 @@ class RetinaSpatialOps{
             ByteProcessor CLBp = topHatIp.createMask()
             roiSkeletonImp.setProcessor(CLBp)
             IJ.run(roiSkeletonImp, "Skeletonize (2D/3D)", "")
+            IJ.log("CLMethod == TopHat")
 
         }
         return [objMask: objMaskImp,  skeletonImp: roiSkeletonImp]
@@ -1560,16 +1599,33 @@ ImagePlus loadValidImage() {
 // 【3-1】extract nucleus region
 //------------------------------------------------------------------------------
 double askNucleusDiameter(ImagePlus ori){
-    if (ori.getProperty("ncDia") > 0) {
+    if (ori.getProperty("ncDia") >= 5) {
         return ori.getProperty("ncDia") as double
+    } else if(ori.getProperty("ncDia") < 5 && ori.getProperty("ncDia") !=0){
+        throw new RuntimeException("[User] Nucleus diameter must be at least 5 pixels.")
     }
+
     IJ.setTool(4)
-    nonBlockDialog("Measure Nuclear Diameter", "Use the Line Tool to draw the widest diameter of a nucleus.", ori, this.&checkLine)
-    Roi roi = ori.getRoi()
-    if(roi instanceof Line){
-        double nucleus_size = (roi as Line).getRawLength()
-        return nucleus_size
+    def latch = new CountDownLatch(1)
+    def cancelled = new AtomicBoolean(false)
+    SwingUtilities.invokeLater{
+        ncDiaAsker(ori, this.&checkLine, latch, cancelled)
     }
+    latch.await()
+    if(cancelled.get()){
+        throw new RuntimeException("[User] User aborted the pipeline.")
+    }
+    Roi roi = ori.getRoi()
+    if (!(roi instanceof Line)) {
+        throw new RuntimeException(
+                "[User] Please draw a line across a representative nucleus."
+        )
+    }
+    double nucleus_size = (roi as Line).getRawLength()
+    if(nucleus_size < 5){
+        throw new RuntimeException("[User] Nucleus diameter must be at least 5 pixels.")
+    }
+    return nucleus_size
 }
 
 def runNucleusExtraction(PipelineContext ctx) {
@@ -1584,28 +1640,29 @@ def runNucleusExtraction(PipelineContext ctx) {
     ImagePlus ori = ctx.getRawColorImg()
 
     ImagePlus oriMask = nucExtractor.run(ori, nucDia )
+    ctx.setNucleiThreshold(oriMask.getProperty("MinThreshold") as double)
     ImagePlus gapRegion = gapExtractor.runII(oriMask, nucDia, 3, ctx.getGapRefine(), MaxGapF)
     Map<String, ImagePlus> connMasks = ConnMasker.run(gapRegion, oriMask, nucDia, 0.7, "refinedMask")
     ImagePlus refinedMask = connMasks.refined
     refinedMask.setProperty("lifeCycle", "Keep")
     if(batchMode) Interpreter.batchMode = false
     refinedMask.show()
-    tracker.getTrackedImages().each { imp ->
-        println "Tracked: ${imp.getTitle()}  (ID=${imp.getID()})"
-    }
     tracker.cleanupByLifeCycle(true)
     ctx.setRefinedMask(refinedMask)
-
 }
 
 //------------------------------------------------------------------------------
 // 【3-2】Manually refine Mask and select object region
 //------------------------------------------------------------------------------
-static void launchAndWaitMaskGui(PipelineContext ctx){
+static void launchAndWaitMaskGui(PipelineContext ctx) {
     def latch = new CountDownLatch(1)
     def controller = new MaskGuiController(ctx, latch)
-    SwingUtilities.invokeLater { controller.show() }
+    SwingUtilities.invokeLater {controller.show()}
     latch.await()
+    if(controller.cancelled){
+        throw new RuntimeException("[User] User aborted the pipeline.")
+    }
+    ctx.getRefinedMask().hide()
 }
 
 //------------------------------------------------------------------------------
@@ -1617,7 +1674,6 @@ static prepareAndAnalysisFeatures(PipelineContext ctx){
     int ncuDia = Math.round(ctx.getNcuDia())
     double scale = ctx.getRawColorImg().getProperty("SCALING") as double
     String unit = ctx.getRawColorImg().getProperty("SCALING_Unit")
-
 
     List objItemList = ctx.getObjectStore().getAll()
 
@@ -1637,61 +1693,103 @@ static prepareAndAnalysisFeatures(PipelineContext ctx){
     }
 }
 
-static void visualiseData(PipelineContext ctx){
-    // --- Step 1: 轉換 mainChain 成 RoiItem ---
-    ImageTracker tracker = ctx.getImgTracker()
-    List<RoiItem> RoiItems = ctx.getRoiStore().getFinalObjs()
-    List objItemList = ctx.getObjectStore().getAll()
-    objItemList.eachWithIndex{ ObjectItem obj, int i ->
-        RoiItems[i].skeletonRoi_Rf = RetinaSpatialOps.chainToRoi(obj.refinedMainChain, "reSkeleton_${i}")
-        RoiItems[i].skeletonRoi = RetinaSpatialOps.chainToRoi(obj.mainChain, "Skeleton_${i}", new Color(0,49,170))
+class AnalysisOutputSaver {
+    PipelineContext ctx
+    String oriPath
+    String ImgName
+    Path outPutPath
+
+    AnalysisOutputSaver (PipelineContext ctx){
+        this.ctx = ctx
+        this.oriPath = ctx.getRawColorImg().getProperty("FilePath")
+        String ImgNameWithExt = Paths.get(oriPath).getFileName().toString()
+        this.ImgName = ImgNameWithExt.substring( 0, ImgNameWithExt.lastIndexOf('.'))
+        this.outPutPath = Paths.get(oriPath).getParent().resolve(ImgName)
     }
-    // --- Step 2: 將所有物件相關 Roi 加入 Roi Manage ---
-    RoiManager rm = RoiManager.getInstance() ?: new RoiManager()
-    rm.reset()
-    RoiItems.eachWithIndex{RoiItem roiItem, int i->
-        roiItem.roi.setName("Object_${i}")
-        rm.addRoi(roiItem.roi)
-        rm.addRoi(roiItem.skeletonRoi_Rf)
-        rm.addRoi(roiItem.skeletonRoi)
-    }
-    // --- Step 3: 物件轉成 CCL 標記 ---
-    List<ImageProcessor> objectMasks = objItemList.collect{obj ->
-        if (!obj.objectMask){
-            return null
+
+     void visualiseDataSaver(){
+        // --- Step 1: 轉換 mainChain 成 RoiItem ---
+        ImageTracker tracker = ctx.getImgTracker()
+        List<RoiItem> RoiItems = ctx.getRoiStore().getFinalObjs()
+        List objItemList = ctx.getObjectStore().getAll()
+        objItemList.eachWithIndex{ ObjectItem obj, int i ->
+            RoiItems[i].skeletonRoi_Rf = RetinaSpatialOps.chainToRoi(obj.refinedMainChain, "reSkeleton_${i}")
+            RoiItems[i].skeletonRoi = RetinaSpatialOps.chainToRoi(obj.mainChain, "Skeleton_${i}", new Color(0,49,170))
         }
-        return obj.objectMask
+        // --- Step 2: 將所有物件相關 Roi 加入 Roi Manage ---
+        RoiManager rm = RoiManager.getInstance() ?: new RoiManager()
+        rm.reset()
+        RoiItems.eachWithIndex{RoiItem roiItem, int i->
+            roiItem.roi.setName("Object_${i}")
+            rm.addRoi(roiItem.roi)
+            rm.addRoi(roiItem.skeletonRoi_Rf)
+            rm.addRoi(roiItem.skeletonRoi)
+        }
+        // --- Step 3: 物件轉成 CCL 標記 ---
+        List<ImageProcessor> objectMasks = objItemList.collect{obj ->
+            if (!obj.objectMask){
+                return null
+            }
+            return obj.objectMask
+        }
+        ImagePlus CCL = tracker.runAndReturn({RetinaSpatialOps.doCCL(objectMasks)})
+        CCL.setProperty("lifeCycle", "Keep")
+
+        // --- Step 4: 量測結果填入表格
+        ResultsTable finalTable = new ResultsTable()
+        for (int i = 0; i < objItemList.size(); i++){
+            Map<String, Double> results = objItemList[i].tkAnalysisResult
+            finalTable.incrementCounter()
+            finalTable.addValue("Object ID", objItemList[i].objectRoi.getName())
+            results.each{entry -> finalTable.addValue( entry.key as String, entry.value as double)}
+        }
+        finalTable.show("Thickness Analysis")
+         ctx.getRefinedMask().show()
+
+        // --- Step 5: 自動存檔 ---
+        Files.createDirectories(outPutPath)
+        Path TablePath = outPutPath.resolve( ImgName + ".csv")
+        finalTable.save(TablePath.toString())
+        Path CCLPath = outPutPath.resolve( ImgName + "_CCL.tiff")
+        IJ.saveAs(CCL , "Tiff", CCLPath.toString())
+        Path rfMaskPath = outPutPath.resolve( ImgName + "_refinedMask.tiff")
+        IJ.saveAs(ctx.getRefinedMask(), "Tiff", rfMaskPath.toString())
+        Path rmRoi = outPutPath.resolve( ImgName + "_roiSet.zip")
+        rm.save(rmRoi.toString())
     }
-    ImagePlus CCL = tracker.runAndReturn({RetinaSpatialOps.doCCL(objectMasks)})
-    CCL.setProperty("lifeCycle", "Keep")
 
-    // --- Step 4: 量測結果填入表格
-    ResultsTable finalTable = new ResultsTable()
-    for (int i = 0; i < objItemList.size(); i++){
-        Map<String, Double> results = objItemList[i].tkAnalysisResult
-        finalTable.incrementCounter()
-        finalTable.addValue("Object ID", objItemList[i].objectRoi.getName())
-        results.each{entry -> finalTable.addValue( entry.key as String, entry.value as double)}
+    void metaDataSaver(){
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        String analysisTime = LocalDateTime.now().format(formatter)
+        FileWriter writer = new FileWriter(outPutPath.resolve( ImgName + "_metadata.txt").toString())
+        String scale =  ctx.getRawColorImg().getProperty("SCALING")
+        String unit = ctx.getRawColorImg().getProperty("SCALING_Unit")
+        String PPMethod = ctx.getRawColorImg().getProperty("PPMethod")
+        String CLMethod = ctx.getRawColorImg().getProperty("CLMethod")
+        String metadata = """
+            RetinaLayerGauge Metadata
+            Analysis date: ${analysisTime}
+            =========================================
+            Image Information
+            Image name: ${ImgName}
+            Original path: ${oriPath}
+            Pixel size: ${scale} x ${scale} ${unit}
+            
+            Analysis settings
+            Stain mode: ${ctx.getStainMode()}
+            Nuclear diameter: ${String.format("%.2f", ctx.getNcuDia())} pixel
+            Nuclear detection method: ${PPMethod}
+            Nuclear mask threshold: ${ctx.getNucleiThreshold()}
+            Remove gap blocking nuclei: ${ctx.getGapRefine()}
+            Maximum gap size to bridge: ${ctx.getMaxGapF()} × nuclear diameter
+            Centerline detection methhod: ${CLMethod}
+           
+            """.stripIndent()
+        writer.write(metadata)
+        writer.close()
     }
-    finalTable.show("Thickness Analysis")
-
-    // --- Step 5: 自動存檔 ---
-    String oriPath = ctx.getRawColorImg().getProperty("FilePath")
-    String ImgName = Paths.get(oriPath).getFileName().toString()
-    ImgName = ImgName.substring( 0, ImgName.lastIndexOf('.'))
-    Path outPutPath = Paths.get(oriPath).getParent().resolve(ImgName)
-    Files.createDirectories(outPutPath)
-
-    Path TablePath = outPutPath.resolve( ImgName + ".csv")
-    finalTable.save(TablePath.toString())
-    Path CCLPath = outPutPath.resolve( ImgName + "_CCL.tiff")
-    IJ.saveAs(CCL , "Tiff", CCLPath.toString())
-    Path rfMaskPath = outPutPath.resolve( ImgName + "_refinedMask.tiff")
-    IJ.saveAs(ctx.getRefinedMask(), "Tiff", rfMaskPath.toString())
 
 }
-
-
 
 // =============================================================================
 // [4] UI – User Interaction & Controllers
@@ -1766,6 +1864,39 @@ def askUserInput() {
 //------------------------------------------------------------------------------
 // 【4-1】Asking the diameter for reference
 //------------------------------------------------------------------------------
+def ncDiaAsker(Imp, Closure check, CountDownLatch latch, AtomicBoolean cancelled) {
+    def frame = new JFrame("Measure Nuclear Diameter")
+    frame.setSize(520, 150)
+    frame.setLayout(new BorderLayout(10, 10))
+    def message = new JLabel("<html><div style='font-size:14pt'> Use the Line Tool to draw the widest diameter of a nucleus. <br></div></html>")
+    message.setBorder(BorderFactory.createEmptyBorder(15, 20, 10, 20))
+    def btnContinue = new JButton("Apply")
+    def btnCancel = new JButton("Cancel")
+
+    def btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10))
+    btnPanel.add(btnContinue)
+    btnPanel.add(btnCancel)
+    frame.add(message, BorderLayout.CENTER)
+    frame.add(btnPanel, BorderLayout.SOUTH)
+    frame.setResizable(false)
+    frame.setAlwaysOnTop(false)
+    frame.setVisible(true)
+
+    //// ==btnPanel Widgets Listeners ==////
+    btnContinue.addActionListener {
+        if (check(Imp) == true) {
+                frame.dispose()
+                latch.countDown()
+            }
+
+    }
+    btnCancel.addActionListener {
+        cancelled.set(true)
+        frame.dispose()
+        latch.countDown()
+    }
+}
+
 def nonBlockDialog(title, content, Imp, Closure check) {
     def locker = new Object()
     SwingUtilities.invokeLater {
@@ -1808,6 +1939,7 @@ def nonBlockDialog(title, content, Imp, Closure check) {
     }
 }
 
+
 def checkLine(Imp) {
     def roi = Imp.getRoi()
     if (roi == null || roi.getType() != Roi.LINE){
@@ -1829,6 +1961,7 @@ class MaskGuiController {
     MaskBrushTool maskBrush
     def BG_MAIN = Color.decode("#e6effc")
     MaskWandTool maskWand
+    volatile boolean cancelled = false
     //RoiStore roiStore
 
     MaskGuiController(PipelineContext ctx, CountDownLatch latch) {
@@ -2186,14 +2319,15 @@ class MaskGuiController {
                 oManager.setDisplay([null])//清除 maskimage 上的 roi
                 oManager.setText([null])// 清除 maskImage 上的 TextLabel
                 MainFrame.dispose()
-                latch.countDown() //通知主流程可以繼續
+                latch.countDown()
             }
         } as ActionListener)
 
         CancelBtn.addActionListener({ ActionEvent it ->
             MainFrame.dispose()
+            cancelled = true
             IJ.error("Aborted", "Process aborted by user.")
-            throw new RuntimeException("Aborted")
+            latch.countDown()
         } as ActionListener)
 
         return BottomPanel
